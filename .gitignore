@@ -33,3 +33,4 @@ go.work.sum
 .vscode/
 /.env_for_github.txt
 /db/config_pgsql.py
+/go_cloud_k8s_employe_jwt.conf
