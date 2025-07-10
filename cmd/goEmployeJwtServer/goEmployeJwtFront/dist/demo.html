@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test goEmployeJwtAuthService</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- just in case the internal function SHA256 does not work -->
+    <script
+      type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"
+    ></script>
+    <!-- Include the UMD bundle -->
+    <script src="./auth-service.umd.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- The h3 tag will be dynamically updated with app name and version -->
+      <h3 id="appInfoHeading">Loading App Info...</h3>
+      <form method="post" action="/gologin" id="loginForm">
+        <div class="row">
+          <div class="six columns">
+            <label for="login">Login:</label><br />
+            <input
+              id="login"
+              type="text"
+              name="login"
+              placeholder="enter the user login"
+              class="u-full-width"
+            />
+          </div>
+          <div class="six columns">
+            <label for="password">Password:</label><br />
+            <input
+              id="password"
+              type="password"
+              name="pass"
+              placeholder="Enter your password here"
+              class="u-full-width"
+            />
+            <input type="hidden" id="hashed" name="hashed" />
+          </div>
+        </div>
+        <input type="submit" class="u-pull-right" />
+      </form>
+      <div class="row">
+        <div class="twelve columns">
+          <div id="msg"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="twelve columns">
+          <label for="tokenExample"
+            >Try your Token in your bash terminal :</label
+          >
+          <textarea class="u-full-width" id="tokenExample" rows="5"> </textarea>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+<script>
+  const loginForm = document.getElementById("loginForm");
+  const msg = document.getElementById("msg");
+  let token = null;
+  const tokenEl = document.getElementById("tokenExample");
+  // Test the goEmployeJwtAuthService (adjust based on your AuthService.ts exports)
+  console.log("goEmployeJwtAuthService:", goEmployeJwtAuthService);
+  const minPasswordLength = 10;
+  let useExternalSha256 = false;
+  // Example: Call getPasswordHashSHA256 function from your AuthService
+  if (typeof goEmployeJwtAuthService.getPasswordHashSHA256 === "function") {
+    goEmployeJwtAuthService.getPasswordHashSHA256("momoLeHaricot", 10)
+      .then((response) =>
+        console.log("getPasswordHashSHA256 Response:", response),
+      )
+      .catch((error) => console.error("getPasswordHashSHA256 Error:", error));
+  } else {
+    console.warn("No method found. Check AuthService exports.");
+    useExternalSha256 = true;
+  }
+  // Get the h3 element where app info will be displayed
+  const appInfoHeading = document.getElementById("appInfoHeading");
+
+  // Function to fetch app information from the API
+  async function fetchAppInfo() {
+    try {
+      // Make a GET request to the /goAppInfo endpoint
+      const response = await fetch("/goAppInfo");
+      // Check if the response was successful
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      // Parse the JSON response
+      const appInfo = await response.json();
+
+      // Update the h3 tag with the app name and version
+      if (appInfo.app && appInfo.version) {
+        appInfoHeading.textContent = `${appInfo.app} - v${appInfo.version}`;
+      } else {
+        appInfoHeading.textContent = "App Info Not Available";
+        console.error("App name or version not found in /goAppInfo response.");
+      }
+
+      // Set the form's action attribute to the authUrl
+      if (appInfo.authUrl) {
+        loginForm.action = appInfo.authUrl;
+        console.log(`Login form action set to: ${loginForm.action}`);
+      } else {
+        console.error("authUrl not found in /goAppInfo response.");
+        // Fallback to default action if authUrl is not provided
+        loginForm.action = "/login";
+      }
+    } catch (error) {
+      // Log any errors during the fetch operation
+      console.error("Could not fetch app information:", error);
+      appInfoHeading.textContent = "Failed to Load App Info";
+      // Set a default action for the form if fetching fails
+      loginForm.action = "/login";
+    }
+  }
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    console.log("in loginForm submit event :", e);
+    const inputPassword = document.getElementById("password");
+    let hashedPassword = null;
+    if (useExternalSha256) {
+      hashedPassword = CryptoJS.SHA256(inputPassword.value);
+    } else {
+      hashedPassword = await goEmployeJwtAuthService.getPasswordHashSHA256(
+        inputPassword.value,
+        minPasswordLength,
+      );
+    }
+    const inputHashedPassword = document.getElementById("hashed");
+    inputHashedPassword.value = hashedPassword.toString();
+    console.log("hashedPassword", inputHashedPassword.value);
+    const inputs = loginForm.elements;
+    if (inputs.login.value.length > 0 && inputs.password.value.length > 0) {
+      const data = new FormData(loginForm);
+      console.log("data", data);
+      // The url for the fetch request is now dynamically set by the fetchAppInfo function
+      const url = loginForm.action;
+      const response = await fetch(url, {
+        method: "post",
+        body: data,
+      });
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        // Display error message in the 'msg' div
+        msg.innerHTML = `<h4>${errorMessage}</h4>`;
+      }
+      const jsonResponse = await response.json();
+      const niceToReadResponse = JSON.stringify(jsonResponse, null, 2);
+      if (Object.hasOwn(jsonResponse, "token")) {
+        token = jsonResponse["token"];
+      } else {
+        msg.innerHTML = `<h4> token key not found in ${niceToReadResponse}</h4>`;
+      }
+      console.log(jsonResponse);
+      tokenEl.innerHTML = `
+export TOKEN="${token}"
+
+curl -v  -H "Authorization: Bearer \${TOKEN}" http://localhost:8787/goapi/v1/status|jq
+            `;
+      msg.innerHTML = `response from server<pre>${niceToReadResponse}</pre>`;
+    } else {
+      msg.innerHTML = "<h4>Login and password values cannot be empty</h4>";
+    }
+  });
+
+  // Call fetchAppInfo when the DOM content is fully loaded
+  document.addEventListener('DOMContentLoaded', fetchAppInfo);
+
+</script>

@@ -181,7 +181,6 @@ const handleLoginSuccess = async (v: string) => {
     "success",
   );
 
-  // retrieve existing points from server
   log.l(`appStore.getUserJwtToken :   ${appStore.getUserJwtToken}`);
 
   if (isNullOrUndefined(autoLogoutTimer)) {

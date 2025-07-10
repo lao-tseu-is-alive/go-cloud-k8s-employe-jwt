@@ -140,7 +140,14 @@ func main() {
 	// Get the ENV JWT_AUTH_URL value
 	jwtAuthUrl := config.GetJwtAuthUrlFromEnvOrPanic()
 
-	myVersionReader := goHttpEcho.NewSimpleVersionReader(version.APP, version.VERSION, version.REPOSITORY, jwtAuthUrl)
+	myVersionReader := goHttpEcho.NewSimpleVersionReader(
+		version.APP,
+		version.VERSION,
+		version.REPOSITORY,
+		version.REVISION,
+		version.BuildStamp,
+		jwtAuthUrl,
+	)
 	// Create a new JWT checker
 	myJwt := goHttpEcho.NewJwtChecker(
 		config.GetJwtSecretFromEnvOrPanic(),

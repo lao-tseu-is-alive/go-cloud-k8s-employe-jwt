@@ -67,17 +67,10 @@
 <script>
 import { isNullOrUndefined } from "@/tools/utils"
 import { BACKEND_URL, getLog } from "@/config"
-import {getToken} from "@/components/AuthService";
+import {getToken, getPasswordHashSHA256} from "@/components/AuthService";
 
 const log = getLog("Login-Vue", 4, 2)
 
-export const getPasswordHashSHA256 = async (password) => {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
-}
 
 export default {
   name: "LoginVue",

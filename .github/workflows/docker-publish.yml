@@ -1,0 +1,136 @@
+name: Docker-publish
+
+on:
+  push:
+    # Publish semver tags as releases.
+    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    # Service containers to run with `builder` job
+    services:
+      # Label used to access the service container
+      # https://docs.github.com/en/actions/using-containerized-services/creating-postgresql-service-containers
+      postgres:
+        # Docker Hub image
+        image: postgis/postgis:14-3.3
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ensure full Git history for git describe
+
+      - name: Set environment variables
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "APP_REVISION=$(git describe --dirty --always)" >> $GITHUB_ENV
+          echo "BUILD=$(date -u '+%Y-%m-%d_%I:%M:%S%p')" >> $GITHUB_ENV
+          echo "APP_REPOSITORY=https://github.com/lao-tseu-is-alive/go-geo-tree-table" >> $GITHUB_ENV
+
+      - name: Test environment variables
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ env.RELEASE_VERSION }}
+          echo $APP_REVISION
+          echo $BUILD
+          echo $APP_REPOSITORY
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '^1.24.4'
+      - run: go version
+
+      - name: Add unaccent extension to Postgres DB
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -p 5432 -d postgres -U postgres -c 'CREATE EXTENSION unaccent;'
+
+      - name: Test
+        env:
+          PORT: 7979
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ISSUER_ID: ${{ secrets.JWT_ISSUER_ID }}
+          JWT_CONTEXT_KEY: ${{ secrets.JWT_CONTEXT_KEY }}
+          JWT_DURATION_MINUTES: 240
+          JWT_AUTH_URL: ${{ secrets.JWT_AUTH_URL }}
+          ADMIN_USER: ${{ secrets.ADMIN_USER }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+          APP_ENV: develop
+          DB_DRIVER: postgres
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_SSL_MODE: prefer
+          DB_NAME: postgres
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          PGPASSWORD: postgres
+          APP_DSN: postgres://127.0.0.1:${{ job.services.postgres.ports[5432] }}/postgres?sslmode=disable&user=postgres&password=postgres
+        run: make -e test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      # Workaround: https://github.com/docker/build-push-action/issues/461
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_REVISION=${{ env.APP_REVISION }}
+            BUILD=${{ env.BUILD }}
+            APP_REPOSITORY=${{ env.APP_REPOSITORY }}

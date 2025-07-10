@@ -103,6 +103,18 @@ const parseJwt = (token: string): JwtPayload => {
   }
 };
 
+export const getPasswordHashSHA256 = async (password:string, minLength:number = 8) => {
+  if (password.trim().length >= minLength) {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(password)
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
+  } else {
+    throw new AuthError(`Password must be at least ${minLength} characters long`)
+  }
+}
+
 // Authenticates a user and saves the session
 export const getToken = async (
   appName: string,
@@ -327,28 +339,20 @@ export const logoutAndResetToken = async (
 // User profile getters
 export const getLocalJwtTokenAuth = (appName: string): string =>
   getUserProfile(appName)?.jwtToken ?? "";
-
 export const getDateExpiration = (appName: string): number =>
   getUserProfile(appName)?.dateExpiration ?? 0;
-
 export const getUserEmail = (appName: string): string =>
   getUserProfile(appName)?.email ?? "";
-
 export const getUserId = (appName: string): number =>
   getUserProfile(appName)?.userId ?? 0;
-
 export const getUserName = (appName: string): string =>
   getUserProfile(appName)?.name ?? "";
-
 export const getUserLogin = (appName: string): string =>
   getUserProfile(appName)?.username ?? "";
-
 export const getUserIsAdmin = (appName: string): boolean =>
   getUserProfile(appName)?.isAdmin ?? false;
-
 export const getSessionId = (appName: string): string =>
   getUserProfile(appName)?.sessionUuid ?? "";
-
 export const getUserGroupsArray = (appName: string): number[] | null => {
   const groups = getUserProfile(appName)?.groups;
   if (!groups || groups === "null") return null;

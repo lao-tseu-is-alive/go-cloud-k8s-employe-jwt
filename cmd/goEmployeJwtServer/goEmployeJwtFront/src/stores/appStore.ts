@@ -95,6 +95,10 @@ export const useAppStore = defineStore("app", {
       try {
         this.appData = await fetchAppInfo(`${BACKEND_URL}/goAppInfo`);
       } catch (error) {
+        this.appData = <AppInfo>{
+          app: "Impossible d'atteindre le serveur : problème réseau ?",
+          version: "ous pouvez essayer de rafraîchir cette page avec la touche F5"
+        };
         log.e("Error fetching app info:", error);
       }
     }

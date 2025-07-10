@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "prebuild": "npm run build:auth-service",
+    "postbuild": "rsync -av  dist_auth_service/ dist/",
+    "preview": "vite preview",
+    "build:auth-service": "vite build --config vite.config.authservice.mjs"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

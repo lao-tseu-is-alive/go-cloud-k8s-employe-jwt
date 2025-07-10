@@ -1,0 +1,97 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go-Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    permissions:
+      contents: read # Grant read access to repository contents
+      pull-requests: read
+    runs-on: ubuntu-latest
+    # Service containers to run with `builder` job
+    services:
+      # Label used to access the service container
+      # https://docs.github.com/en/actions/using-containerized-services/creating-postgresql-service-containers
+      postgres:
+        # Docker Hub image
+        image: postgis/postgis:14-3.3
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+    - uses: actions/checkout@v4 # Action to checkout your repository code
+    - name: Set env
+      run: | 
+        echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        echo "REVISION=$(git describe --dirty --always)" >> $GITHUB_ENV
+        echo "NOW=$(date +%Y-%m-%dT%T)" >> $GITHUB_ENV
+        echo "APP_REPOSITORY=github.com/${GITHUB_REPOSITORY}" >> $GITHUB_ENV
+
+    - name: Compose LDFLAGS
+      run: |
+        LDFLAGS="-X ${APP_REPOSITORY}/pkg/version.BuildStamp=${NOW} -X ${APP_REPOSITORY}/pkg/version.REVISION=${REVISION}"
+        echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
+      env:
+        APP_REPOSITORY: ${{ env.APP_REPOSITORY }}
+        NOW: ${{ env.NOW }}
+        REVISION: ${{ env.REVISION }}
+
+    - name: Show LDFLAGS
+      run: echo "$LDFLAGS"
+      env:
+        LDFLAGS: ${{ env.LDFLAGS }}
+
+    - name: Preparing Test Env
+      run: |
+        echo $RELEASE_VERSION
+        echo ${{ env.RELEASE_VERSION }}
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.4'
+    - run: go version
+
+    - name: Add unaccent extension to Postgres DB
+      env:
+        PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+      run: psql -h localhost -p 5432 -d postgres -U postgres -c 'CREATE EXTENSION unaccent;'
+
+    - name: Build
+      run: go build -ldflags "$LDFLAGS" -v ./...
+
+    - name: Test
+      env:
+        DB_DRIVER: postgres
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
+        DB_SSL_MODE: prefer
+        DB_NAME: postgres
+        DB_USER: postgres
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        PORT: 9999
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_ISSUER_ID: ${{ secrets.JWT_ISSUER_ID }}
+        JWT_CONTEXT_KEY: ${{ secrets.JWT_CONTEXT_KEY }}
+        JWT_DURATION_MINUTES: 240
+        JWT_AUTH_URL: ${{ secrets.JWT_AUTH_URL }}
+        ADMIN_USER: ${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        ADMIN_ID: ${{ secrets.ADMIN_ID }}
+      run: go test -race -coverprofile coverage.txt -coverpkg=./... ./cmd/goEmployeJwtServer
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
