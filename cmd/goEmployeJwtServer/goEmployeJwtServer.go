@@ -11,6 +11,7 @@ import (
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/metadata"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/tools"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt/pkg/f5"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt/pkg/version"
 	"log"
 	"net/http"
@@ -28,9 +29,12 @@ const (
 	defaultAdminUser             = "goadmin"
 	defaultAdminEmail            = "goadmin@yourdomain.org"
 	defaultAdminId               = 960901
-	charsetUTF8                  = "charset=UTF-8"
-	MIMEHtml                     = "text/html"
-	MIMEHtmlCharsetUTF8          = MIMEHtml + "; " + charsetUTF8
+	/*
+		charsetUTF8                  = "charset=UTF-8"
+		MIMEHtml                     = "text/html"
+		MIMEHtmlCharsetUTF8          = MIMEHtml + "; " + charsetUTF8
+
+	*/
 )
 
 // content holds our static web server content.
@@ -45,9 +49,56 @@ type UserLogin struct {
 }
 type Service struct {
 	Logger golog.MyLogger
-	//Store       Storage
+	Store  f5.Storage
 	dbConn database.DB
 	server *goHttpEcho.Server
+	auth   f5.Authentication
+}
+
+func (s Service) getJwtTokenFromF5(ctx echo.Context) error {
+	s.Logger.TraceHttpRequest("getJwtTokenFromF5", ctx.Request())
+	// get the user from the F5 Header UserId
+	login := ctx.Request().Header.Get("UserId")
+	if login == "" {
+		myErrMsg := "UserId F5 header missing"
+		s.Logger.Warn(myErrMsg)
+		// On error, you can return JS that logs an error
+		jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
+		ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
+		return ctx.String(http.StatusInternalServerError, jsError)
+	} else {
+		s.Logger.Debug("About to check username: %s ", login)
+		if s.auth.AuthenticateUser(login, "nothing") {
+			userInfo, err := s.server.Authenticator.GetUserInfoFromLogin(login)
+			if err != nil {
+				myErrMsg := fmt.Sprintf("Error getting user info from login: %v", err)
+				s.Logger.Error(myErrMsg)
+				// On error, you can return JS that logs an error
+				jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
+				ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
+				return ctx.String(http.StatusInternalServerError, jsError)
+			}
+			token, err := s.server.JwtCheck.GetTokenFromUserInfo(userInfo)
+			if err != nil {
+				myErrMsg := fmt.Sprintf("Error getting jwt token from user info: %v", err)
+				s.Logger.Error(myErrMsg)
+				// On error, you can return JS that logs an error
+				jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
+				ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
+				return ctx.String(http.StatusInternalServerError, jsError)
+			}
+
+			s.Logger.Info("LoginUser(%s) successful login", login)
+			// Prepare the JavaScript code as a string
+			sessionKey := fmt.Sprintf("%s_goapi_jwt_session_token", version.APP)
+			jsCode := fmt.Sprintf("sessionStorage.setItem(%s, '%s'); console.log('JWT token has been stored.');", sessionKey, token.String())
+			// Set the correct Content-Type header and send the string
+			ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
+			return ctx.String(http.StatusOK, jsCode)
+		} else {
+			return ctx.JSON(http.StatusUnauthorized, "username not found or password invalid")
+		}
+	}
 }
 
 // login is just a trivial stupid example to test this server
@@ -98,11 +149,12 @@ func (s Service) GetStatus(ctx echo.Context) error {
 	// get the current user from JWT TOKEN
 	claims := s.server.JwtCheck.GetJwtCustomClaimsFromContext(ctx)
 	currentUserId := claims.User.UserId
+	currentUserLogin := claims.User.Login
 	s.Logger.Info("in GetStatus : currentUserId: %d", currentUserId)
 	// you can check if the user is not active anymore and RETURN 401 Unauthorized
-	//if !s.Store.IsUserActive(currentUserId) {
-	//	return echo.NewHTTPError(http.StatusUnauthorized, "current calling user is not active anymore")
-	//}
+	if !s.Store.Exist(currentUserLogin) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "current calling user does not exist")
+	}
 	return ctx.JSON(http.StatusOK, claims)
 }
 
@@ -156,19 +208,23 @@ func main() {
 		config.GetJwtContextKeyFromEnvOrPanic(),
 		config.GetJwtDurationFromEnvOrPanic(60),
 		l)
-	// Create a new Authenticator with a simple admin user
-	myAuthenticator := goHttpEcho.NewSimpleAdminAuthenticator(&goHttpEcho.UserInfo{
-		UserId:     config.GetAdminIdFromEnvOrPanic(defaultAdminId),
-		ExternalId: config.GetAdminExternalIdFromEnvOrPanic(9999999),
-		Name:       "NewSimpleAdminAuthenticator_Admin",
-		Email:      config.GetAdminEmailFromEnvOrPanic(defaultAdminEmail),
-		Login:      config.GetAdminUserFromEnvOrPanic(defaultAdminUser),
-		IsAdmin:    false,
-		Groups:     []int{1}, // this is the group id of the global_admin group
-	},
 
+	myF5Store := f5.GetStorageInstanceOrPanic("pgx", db, l)
+	// Create a new Authenticator with a F5
+	myAuthenticator := f5.NewF5Authenticator(
+		&goHttpEcho.UserInfo{
+			UserId:     config.GetAdminIdFromEnvOrPanic(defaultAdminId),
+			ExternalId: config.GetAdminExternalIdFromEnvOrPanic(9999999),
+			Name:       "NewSimpleAdminAuthenticator_Admin",
+			Email:      config.GetAdminEmailFromEnvOrPanic(defaultAdminEmail),
+			Login:      config.GetAdminUserFromEnvOrPanic(defaultAdminUser),
+			IsAdmin:    false,
+			Groups:     []int{1}, // this is the group id of the global_admin group
+		},
 		config.GetAdminPasswordFromEnvOrPanic(),
-		myJwt)
+		myJwt,
+		myF5Store,
+	)
 
 	server := goHttpEcho.CreateNewServerFromEnvOrFail(
 		defaultPort,
@@ -184,6 +240,13 @@ func main() {
 			RestrictedUrl: defaultRestrictedUrlBasePath,
 		},
 	)
+	myF5Service := Service{
+		Logger: l,
+		Store:  myF5Store,
+		dbConn: db,
+		server: server,
+		auth:   myAuthenticator,
+	}
 
 	e := server.GetEcho()
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -209,15 +272,13 @@ func main() {
 		l.Info("%s DB version : %s", info, getVersion)
 		return true
 	}, "Connection to DB"))
-	yourService := Service{
-		Logger: l,
-		dbConn: db,
-		server: server,
-	}
+
 	e.GET("/goAppInfo", server.GetAppInfoHandler())
-	e.POST(jwtAuthUrl, yourService.login)
+	e.POST(jwtAuthUrl, myF5Service.login)
+	//curl -H "UserId: YOUR_F5_USER" http://localhost:8787/jwtinfo.js|jq
+	e.GET("/jwtinfo.js", myF5Service.getJwtTokenFromF5)
 	r := server.GetRestrictedGroup()
-	r.GET("/status", yourService.GetStatus)
+	r.GET("/status", myF5Service.GetStatus)
 
 	err = server.StartServer()
 	if err != nil {

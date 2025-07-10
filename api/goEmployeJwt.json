@@ -1,0 +1,881 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "goEmployeJwt microservice written in Golang",
+    "description": "OpenApi Specification for an API to manage goEmployeJwt",
+    "contact": {
+      "name": "go-geo-tree-table API Team",
+      "url": "https://goeland.io",
+      "email": "go-geo-tree-table@goeland.io"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "0.0.11"
+  },
+  "servers": [
+    {
+      "url": "https://api.goeland.io/"
+    }
+  ],
+  "paths": {
+    "/goEmployeJwt": {
+      "get": {
+        "summary": "List returns a list of goEmployeJwt",
+        "description": "Returns the goEmployeJwt in an array",
+        "operationId": "List",
+        "parameters": [
+          {
+            "name": "cada_date",
+            "in": "query",
+            "description": "cada_date is the date to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "description": "id of the creator to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "description": "add records that are deleted to the list of geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "maximum number of results to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "offset rows to skip before returning rows",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get List of geoTree response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/geoTreeList"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "default": {
+            "description": "unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create will create a new geoTree",
+        "description": "Creates a new geoTree",
+        "operationId": "Create",
+        "requestBody": {
+          "description": "geoTree to add",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/geoTree"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "geoTree creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/geoTree"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "default": {
+            "description": "unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    },
+    "/geoTreeByPosition": {
+      "get": {
+        "summary": "List returns a list of geoTree by given position and radius",
+        "description": "Returns the geoTree in an array",
+        "operationId": "ListByPosition",
+        "parameters": [
+          {
+            "name": "pos_east",
+            "in": "query",
+            "description": "Coordonnées Est-Ouest - X de la liste de positions de départ",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "pos_north",
+            "in": "query",
+            "description": "Coordonnées Nord-Sud - Y  de la liste de positions de départ",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "description": "rayon de recherche de la liste de positions de départ",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get List of geoTree response by Position criteria",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/geoTreeList"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "default": {
+            "description": "unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    },
+    "/geoTree/geojson": {
+      "get": {
+        "summary": "List returns a geoJson of geoTrees found",
+        "description": "Returns the geoJson of the geoTree selected by the given parameters",
+        "operationId": "GeoJson",
+        "parameters": [
+          {
+            "name": "cada_date",
+            "in": "query",
+            "description": "cada_date is the date to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "description": "id of the creator to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get List of geoTree response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "default": {
+            "description": "unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    },
+    "/geoTree/count": {
+      "get": {
+        "summary": "Count returns the number of geoTree based on search criterias",
+        "description": "Returns the number of geoTrees found after filtering with passed criterias",
+        "operationId": "Count",
+        "parameters": [
+          {
+            "name": "cada_date",
+            "in": "query",
+            "description": "cada_date is the date to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "description": "id of the creator to filter by the geoTrees to return",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get List of geoTree response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "default": {
+            "description": "unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    },
+    "/geoTree/{geoTreeId}": {
+      "get": {
+        "summary": "Get will retrieve in backend all information about a specific geoTreeId",
+        "description": "Retrieve a specific geoTree",
+        "operationId": "Get",
+        "parameters": [
+          {
+            "name": "geoTreeId",
+            "in": "path",
+            "description": "Id of the geoTree",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "get geoTree successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/geoTree"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "404": {
+            "description": "get geoTrees response when geoTreeId was not found"
+          },
+          "default": {
+            "description": "unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update allows to modify information about a specific geoTreeId",
+        "description": "Updates the status of a geoTree",
+        "operationId": "Update",
+        "parameters": [
+          {
+            "name": "geoTreeId",
+            "in": "path",
+            "description": "Id of the geoTree",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "informations related to the geoTree",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/geoTree"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "put geoTrees successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/geoTree"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "404": {
+            "description": "put geoTrees response when geoTreeId was not found"
+          },
+          "default": {
+            "description": "unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete allows to delete a specific geoTreeId",
+        "description": "delete a geoTree",
+        "operationId": "Delete",
+        "parameters": [
+          {
+            "name": "geoTreeId",
+            "in": "path",
+            "description": "Id of the geoTree",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "delete geoTree successful no content"
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "404": {
+            "description": "delete geoTree response when geoTreeId was not found"
+          },
+          "default": {
+            "description": "unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    },
+    "/geoTree/setGoelandThingId/{geoTreeId}": {
+      "put": {
+        "summary": "Update allows to modify goeland_thing_id information about a specific geoTreeId",
+        "description": "Updates the goeland_thing_id of a geoTree",
+        "operationId": "UpdateGoeland_thing_id",
+        "parameters": [
+          {
+            "name": "geoTreeId",
+            "in": "path",
+            "description": "Id of the geoTree",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "informations related to the goeland_thing_id for this geoTree",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/geoTreeGoelandThingId"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "put geoTrees successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/geoTreeGoelandThingId"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid"
+          },
+          "404": {
+            "description": "put geoTrees response when geoTreeId was not found"
+          },
+          "default": {
+            "description": "unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "geoTree": {
+        "required": [
+          "id",
+          "cada_id",
+          "cada_code",
+          "cada_date",
+          "cada_comment",
+          "created_by",
+          "pos_east",
+          "pos_north"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "identifiant interne pour cet objet",
+            "description": "cet Universally unique identifier (UUID) sera généré automatiquement pour vous "
+          },
+          "goeland_thing_id": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant cadastre",
+            "description": "FK sur la clé primaire du goéland Thing de type arbre pour cette position d'objet"
+          },
+          "cada_id": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant cadastre",
+            "description": "identifiant interne de cadastre pour cet objet"
+          },
+          "cada_code": {
+            "type": "integer",
+            "format": "int32",
+            "title": "code de levé cadastre",
+            "description": "code interne de cadastre pour ce type de point"
+          },
+          "tree_circumference_cm": {
+            "format": "int32",
+            "type": "integer",
+            "title": "circonférence tronc en cm"
+          },
+          "tree_crown_m": {
+            "type": "number",
+            "format": "double",
+            "title": "couronne arbre en m"
+          },
+          "cada_tree_type": {
+            "format": "text",
+            "type": "string",
+            "title": "essence arbre cadastre"
+          },
+          "cada_comment": {
+            "format": "text",
+            "type": "string",
+            "title": "commentaire cadastre (campagne de levé)"
+          },
+          "cada_date": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date du levé par cadastre pour cet objet"
+          },
+          "description": {
+            "format": "text",
+            "type": "string",
+            "title": "description"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date création",
+            "description": "date de création de cet enregistrement dans la base"
+          },
+          "created_by": {
+            "format": "int32",
+            "type": "integer",
+            "title": "utilisateur ayant créé cet enregistrement",
+            "description": "identifiant de l'utilisateur ayant créé cet enregistrement"
+          },
+          "goeland_thing_saved_at": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date saisie id thing arbre",
+            "description": "date saisie id thing arbre goéland correspondant a cette position"
+          },
+          "goeland_thing_saved_by": {
+            "format": "int32",
+            "type": "integer",
+            "title": "utilisateur ayant effectué la saisie id thing arbre",
+            "description": "utilisateur ayant effectué la dernière saisie id thing arbre goéland correspondant a cette position"
+          },
+          "deleted": {
+            "default": false,
+            "type": "boolean",
+            "title": "effacé?",
+            "description": "cet enregisrement a été marqué comme effacé"
+          },
+          "deleted_at": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date effacé",
+            "description": "date à laquelle cet enregisrement a été marqué comme effacé"
+          },
+          "deleted_by": {
+            "format": "int32",
+            "type": "integer",
+            "title": "utilisateur ayant effacé",
+            "description": "utilisateur ayant demandé de marquer cet enregisrement comme effacé"
+          },
+          "pos_east": {
+            "type": "number",
+            "format": "double",
+            "title": "Coordonnées Est-Ouest - X de cet objet"
+          },
+          "pos_north": {
+            "type": "number",
+            "format": "double",
+            "title": "Coordonnées Nord-Sud - Y de cet objet"
+          },
+          "pos_altitude": {
+            "type": "number",
+            "format": "double",
+            "title": "Altitude - Z de cet objet"
+          }
+        }
+      },
+      "geoTreeList": {
+        "required": [
+          "id",
+          "cada_id",
+          "tree_circumference_cm",
+          "tree_crown_m",
+          "cada_tree_type",
+          "cada_date",
+          "cada_comment",
+          "created_at",
+          "created_by",
+          "pos_east",
+          "pos_north"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "identifiant interne pour cet objet",
+            "description": "cet Universally unique identifier (UUID) sera généré automatiquement pour vous "
+          },
+          "goeland_thing_id": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant cadastre",
+            "description": "FK sur la clé primaire du goéland Thing de type arbre pour cette position d'objet"
+          },
+          "cada_id": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant cadastre",
+            "description": "identifiant interne de cadastre pour cet objet"
+          },
+          "tree_circumference_cm": {
+            "format": "int32",
+            "type": "integer",
+            "title": "circonférence tronc en cm"
+          },
+          "tree_crown_m": {
+            "type": "number",
+            "format": "double",
+            "title": "couronne arbre en m"
+          },
+          "cada_tree_type": {
+            "format": "text",
+            "type": "string",
+            "title": "essence arbre cadastre"
+          },
+          "cada_comment": {
+            "format": "text",
+            "type": "string",
+            "title": "commentaire cadastre (campagne de levé)"
+          },
+          "cada_date": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date du levé par cadastre pour cet objet"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "title": "date création",
+            "description": "date de création de cet enregistrement dans la base"
+          },
+          "created_by": {
+            "format": "int32",
+            "type": "integer",
+            "title": "utilisateur ayant créé cet enregistrement",
+            "description": "identifiant de l'utilisateur ayant créé cet enregistrement"
+          },
+          "pos_east": {
+            "type": "number",
+            "format": "double",
+            "title": "Coordonnées Est-Ouest - X de cet objet"
+          },
+          "pos_north": {
+            "type": "number",
+            "format": "double",
+            "title": "Coordonnées Nord-Sud - Y de cet objet"
+          }
+        }
+      },
+      "geoTreeGoelandThingId": {
+        "required": [
+          "id",
+          "goeland_thing_id",
+          "goeland_thing_saved_by"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "identifiant interne pour cet objet",
+            "description": "cet Universally unique identifier (UUID) sera généré automatiquement pour vous "
+          },
+          "goeland_thing_id": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant cadastre",
+            "description": "FK sur la clé primaire du goéland Thing de type arbre pour cette position d'objet"
+          },
+          "goeland_thing_saved_by": {
+            "type": "integer",
+            "format": "int32",
+            "title": "identifiant utilisateur spadom",
+            "description": "FK sur la clé primaire de utilisateur spadom qui alimente l'info goéland Thing de type arbre pour cette position d'objet"
+          }
+        }
+      },
+      "Error": {
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "JsonWebToken": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Access token is missing or invalid"
+      }
+    },
+    "securitySchemes": {
+      "JWTAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
