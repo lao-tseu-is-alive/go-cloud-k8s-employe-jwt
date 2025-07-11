@@ -25,7 +25,7 @@ func (db *PGX) Get(login string) (*User, error) {
 		return nil, errors.New(msg)
 	}
 	res := &User{}
-	err := pgxscan.Get(context.Background(), db.Conn, res, getUser, login)
+	err := pgxscan.Get(context.Background(), db.Conn, res, getUser, fmt.Sprintf("%%%s", login))
 	if err != nil {
 		db.log.Error(SelectFailedInNWithErrorE, "Get", err)
 		return nil, err
@@ -45,10 +45,10 @@ func (db *PGX) Exist(login string) bool {
 		return false
 	}
 	if count > 0 {
-		db.log.Info(" Exist(%v) id does exist  count:%v", login, count)
+		db.log.Info("Exist(%v) id does exist  count:%v", login, count)
 		return true
 	} else {
-		db.log.Info(" Exist(%v) id does not exist count:%v", login, count)
+		db.log.Info("Exist(%v) id does not exist count:%v", login, count)
 		return false
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -55,17 +56,77 @@ type Service struct {
 	auth   f5.Authentication
 }
 
-func (s Service) getJwtTokenFromF5(ctx echo.Context) error {
-	s.Logger.TraceHttpRequest("getJwtTokenFromF5", ctx.Request())
+func cookieToHeaderMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		// If the Authorization header is already present, do nothing.
+		if c.Request().Header.Get("Authorization") != "" {
+			return next(c)
+		}
+
+		cookie, err := c.Cookie("jwt-token")
+		if err == nil {
+			// If the cookie exists, create the Bearer token header.
+			bearerToken := "Bearer " + cookie.Value
+			c.Request().Header.Set("Authorization", bearerToken)
+		}
+
+		return next(c)
+	}
+}
+
+func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
+	s.Logger.TraceHttpRequest("getJwtCookieFromF5", ctx.Request())
 	// get the user from the F5 Header UserId
-	login := ctx.Request().Header.Get("UserId")
+	login := strings.TrimSpace(ctx.Request().Header.Get("UserId"))
+	if login == "" {
+		myErrMsg := "getJwtCookieFromF5 failed to get login because UserId F5 header is missing"
+		s.Logger.Warn(myErrMsg)
+		return ctx.JSON(http.StatusUnauthorized, map[string]string{"status": myErrMsg})
+	} else {
+		s.Logger.Debug("About to check username: %s ", login)
+		if s.auth.AuthenticateUser(login, "nothing") {
+			userInfo, err := s.server.Authenticator.GetUserInfoFromLogin(login)
+			if err != nil {
+				myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get user info from login: %v", err)
+				s.Logger.Error(myErrMsg)
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{"status": myErrMsg})
+			}
+			token, err := s.server.JwtCheck.GetTokenFromUserInfo(userInfo)
+			if err != nil {
+				myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get jwt token from user info: %v", err)
+				s.Logger.Error(myErrMsg)
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{"status": myErrMsg})
+			}
+			// Prepare the http only cookie for jwt token
+			cookie := new(http.Cookie)
+			cookie.Name = "jwt-token"
+			cookie.Value = token.String()
+			cookie.Expires = time.Now().Add(24 * time.Hour) // Set expiration
+			cookie.HttpOnly = true                          // ⭐ Most important part: prevents JS access
+			cookie.Secure = true                            // Only send over HTTPS
+			cookie.SameSite = http.SameSiteLaxMode          // CSRF protection
+			ctx.SetCookie(cookie)
+			myMsg := fmt.Sprintf("getJwtCookieFromF5(%s) successful, token set in HTTP-Only cookie.", login)
+			s.Logger.Info(myMsg)
+			return ctx.JSON(http.StatusOK, myMsg)
+		} else {
+			myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get jwt token user: %s, does not exist in DB", login)
+			s.Logger.Warn(myErrMsg)
+			return ctx.JSON(http.StatusUnauthorized, map[string]string{"status": myErrMsg})
+		}
+	}
+}
+
+func (s Service) getJwtTokenFromF5AsJS(ctx echo.Context) error {
+	s.Logger.TraceHttpRequest("getJwtTokenFromF5AsJS", ctx.Request())
+	// get the user from the F5 Header UserId
+	login := strings.TrimSpace(ctx.Request().Header.Get("UserId"))
 	if login == "" {
 		myErrMsg := "UserId F5 header missing"
 		s.Logger.Warn(myErrMsg)
-		// On error, you can return JS that logs an error
 		jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
 		ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
-		return ctx.String(http.StatusInternalServerError, jsError)
+		return ctx.String(http.StatusUnauthorized, jsError)
 	} else {
 		s.Logger.Debug("About to check username: %s ", login)
 		if s.auth.AuthenticateUser(login, "nothing") {
@@ -82,7 +143,6 @@ func (s Service) getJwtTokenFromF5(ctx echo.Context) error {
 			if err != nil {
 				myErrMsg := fmt.Sprintf("Error getting jwt token from user info: %v", err)
 				s.Logger.Error(myErrMsg)
-				// On error, you can return JS that logs an error
 				jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
 				ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
 				return ctx.String(http.StatusInternalServerError, jsError)
@@ -96,7 +156,11 @@ func (s Service) getJwtTokenFromF5(ctx echo.Context) error {
 			ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
 			return ctx.String(http.StatusOK, jsCode)
 		} else {
-			return ctx.JSON(http.StatusUnauthorized, "username not found or password invalid")
+			myErrMsg := "Error getting jwt token user does not exist in DB"
+			s.Logger.Error(myErrMsg)
+			jsError := fmt.Sprintf("console.error('Failed to get JWT token: %s');", myErrMsg)
+			ctx.Response().Header().Set(echo.HeaderContentType, "application/javascript; charset=utf-8")
+			return ctx.String(http.StatusUnauthorized, jsError)
 		}
 	}
 }
@@ -249,6 +313,7 @@ func main() {
 	}
 
 	e := server.GetEcho()
+	e.Use(cookieToHeaderMiddleware)
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"https://golux.lausanne.ch", "http://localhost:3000"},
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
@@ -275,8 +340,13 @@ func main() {
 
 	e.GET("/goAppInfo", server.GetAppInfoHandler())
 	e.POST(jwtAuthUrl, myF5Service.login)
-	//curl -H "UserId: YOUR_F5_USER" http://localhost:8787/jwtinfo.js|jq
-	e.GET("/jwtinfo.js", myF5Service.getJwtTokenFromF5)
+	//curl -v -H "UserId: YOUR_F5_USER" -c cookies.txt http://localhost:8787/goLogin
+	//curl -v -b cookies.txt http://localhost:8787/goapi/v1/status
+	// or if you have a token stored in $TOKEN
+	//curl -v -b "jwt-token=${TOKEN}"  http://localhost:8787/goapi/v1/status
+	e.GET(jwtAuthUrl, myF5Service.getJwtCookieFromF5)
+	//curl -H "UserId: YOUR_F5_USER" http://localhost:8787/jwtinfo.js
+	e.GET("/jwtinfo.js", myF5Service.getJwtTokenFromF5AsJS)
 	r := server.GetRestrictedGroup()
 	r.GET("/status", myF5Service.GetStatus)
 

@@ -2,6 +2,7 @@ package f5
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/goHttpEcho"
 )
@@ -26,7 +27,7 @@ type Authenticator struct {
 // AuthenticateUser Implement the AuthenticateUser method for F5Authenticator
 func (sa *Authenticator) AuthenticateUser(userLogin, passwordHash string) bool {
 	l := sa.jwtChecker.GetLogger()
-	l.Info("userLogin: %s", userLogin)
+	l.Info("AuthenticateUser(%s)", userLogin)
 	// check if it's the env admin user
 	if userLogin == sa.mainAdminUserLogin && passwordHash == sa.mainAdminPasswordHash {
 		return true
@@ -35,23 +36,45 @@ func (sa *Authenticator) AuthenticateUser(userLogin, passwordHash string) bool {
 	if sa.store.Exist(userLogin) {
 		return true
 	}
-	sa.jwtChecker.GetLogger().Info("User %s was not authenticated", userLogin)
+	l.Warn("AuthenticateUser(%s) is false user will not be authenticated", userLogin)
 	return false
 }
 
 // GetUserInfoFromLogin Get the JWT claims from the login User
 func (sa *Authenticator) GetUserInfoFromLogin(login string) (*goHttpEcho.UserInfo, error) {
-
-	user := &goHttpEcho.UserInfo{
-		UserId:     sa.mainAdminId,
-		ExternalId: sa.mainAdminExternalId,
-		Name:       fmt.Sprintf("SimpleAdminAuthenticator_%s", sa.mainAdminUserLogin),
-		Email:      sa.mainAdminEmail,
-		Login:      login,
-		IsAdmin:    true,
-		Groups:     []int{1}, // this is the group id of the global_admin group
+	l := sa.jwtChecker.GetLogger()
+	l.Info("GetUserInfoFromLogin(%s)", login)
+	if sa.store.Exist(login) {
+		u, err := sa.store.Get(login)
+		if err != nil {
+			msg := fmt.Sprintf("GetUserInfoFromLogin(%s) failed doing store.Get err: %s", login, err)
+			l.Warn(msg)
+			return nil, errors.New(msg)
+		} else {
+			var isItAdmin bool
+			var userDefaultGroup []int
+			isItAdmin = false
+			userDefaultGroup = append(userDefaultGroup, 0)
+			if u.Id < 10 {
+				isItAdmin = true
+				userDefaultGroup = append(userDefaultGroup, 1) // this is the group id of the global_admin group
+			}
+			user := &goHttpEcho.UserInfo{
+				UserId:     int(u.Id),
+				ExternalId: int(u.Id),
+				Name:       u.Name,
+				Email:      u.Email,
+				Login:      login,
+				IsAdmin:    isItAdmin,
+				Groups:     userDefaultGroup,
+			}
+			return user, nil
+		}
+	} else {
+		msg := fmt.Sprintf("GetUserInfoFromLogin(%s) failed because user does not exist", login)
+		l.Warn(msg)
+		return nil, errors.New(msg)
 	}
-	return user, nil
 }
 
 // NewF5Authenticator Function to create an instance of F5Authenticator
