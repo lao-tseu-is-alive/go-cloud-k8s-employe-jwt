@@ -25,7 +25,7 @@ func (db *PGX) Get(login string) (*User, error) {
 		return nil, errors.New(msg)
 	}
 	res := &User{}
-	err := pgxscan.Get(context.Background(), db.Conn, res, getUser, fmt.Sprintf("%%%s", login))
+	err := pgxscan.Get(context.Background(), db.Conn, res, getUser, login)
 	if err != nil {
 		db.log.Error(SelectFailedInNWithErrorE, "Get", err)
 		return nil, err
@@ -39,7 +39,7 @@ func (db *PGX) Get(login string) (*User, error) {
 
 func (db *PGX) Exist(login string) bool {
 	db.log.Debug("trace : entering Exist(%v)", login)
-	count, err := db.dbi.GetQueryInt(existUser, fmt.Sprintf("%%%s", login))
+	count, err := db.dbi.GetQueryInt(existUser, login)
 	if err != nil {
 		db.log.Error("Exist(%v) could not be retrieved from DB. failed db.Query err: %v", login, err)
 		return false

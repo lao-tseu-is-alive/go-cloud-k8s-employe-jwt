@@ -28,6 +28,16 @@ type Authenticator struct {
 func (sa *Authenticator) AuthenticateUser(userLogin, passwordHash string) bool {
 	l := sa.jwtChecker.GetLogger()
 	l.Info("AuthenticateUser(%s)", userLogin)
+	err := ValidateLogin(userLogin)
+	if err != nil {
+		l.Warn("invalid user login : %s", err)
+		return false
+	}
+	err = ValidatePasswordHash(passwordHash)
+	if err != nil {
+		l.Warn("invalid password hash : %s", err)
+		return false
+	}
 	// check if it's the env admin user
 	if userLogin == sa.mainAdminUserLogin && passwordHash == sa.mainAdminPasswordHash {
 		return true

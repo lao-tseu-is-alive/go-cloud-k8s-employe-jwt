@@ -3,7 +3,7 @@ package f5
 const (
 	getPostgresVersion = "SELECT version();"
 	countUsers         = "SELECT COUNT(*) FROM employe WHERE isactive=true;"
-	existUser          = "SELECT COUNT(*) FROM employe WHERE isactive=true AND mainntlogin ilike $1;"
+	existUser          = "SELECT COUNT(*) FROM employe WHERE isactive=true AND mainntlogin ILIKE '%' || $1 || '%';"
 	getUser            = `
 select  
     idemploye as id,
@@ -14,6 +14,6 @@ from employe
 where
     isactive=true
     AND
-    mainntlogin ilike $1;
+    mainntlogin ILIKE '%' || $1 || '%';
 `
 )

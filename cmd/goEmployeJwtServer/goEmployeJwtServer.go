@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"embed"
 	"fmt"
 	"github.com/labstack/echo/v4"
@@ -84,7 +85,17 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 		return ctx.JSON(http.StatusUnauthorized, map[string]string{"status": myErrMsg})
 	} else {
 		s.Logger.Debug("About to check username: %s ", login)
-		if s.auth.AuthenticateUser(login, "nothing") {
+		err := f5.ValidateLogin(login)
+		if err != nil {
+			errMsg := fmt.Sprintf("error validating user login: %v", err)
+			s.Logger.Error(errMsg)
+			return ctx.JSON(http.StatusBadRequest, errMsg)
+		}
+		h := sha256.New()
+		h.Write([]byte(version.APP))
+		// just to get a valid hash, not used with F5
+		appPasswordHash := fmt.Sprintf("%x", h.Sum(nil))
+		if s.auth.AuthenticateUser(login, appPasswordHash) {
 			userInfo, err := s.server.Authenticator.GetUserInfoFromLogin(login)
 			if err != nil {
 				myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get user info from login: %v", err)
@@ -129,6 +140,12 @@ func (s Service) getJwtTokenFromF5AsJS(ctx echo.Context) error {
 		return ctx.String(http.StatusUnauthorized, jsError)
 	} else {
 		s.Logger.Debug("About to check username: %s ", login)
+		err := f5.ValidateLogin(login)
+		if err != nil {
+			errMsg := fmt.Sprintf("error validating user login: %v", err)
+			s.Logger.Error(errMsg)
+			return ctx.JSON(http.StatusBadRequest, errMsg)
+		}
 		if s.auth.AuthenticateUser(login, "nothing") {
 			userInfo, err := s.server.Authenticator.GetUserInfoFromLogin(login)
 			if err != nil {
@@ -182,6 +199,18 @@ func (s Service) login(ctx echo.Context) error {
 	} else {
 		uLogin.Username = login
 		uLogin.PasswordHash = passwordHash
+	}
+	err := f5.ValidateLogin(uLogin.Username)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating user login: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusInternalServerError, errMsg)
+	}
+	err = f5.ValidatePasswordHash(uLogin.PasswordHash)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating password hash: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusInternalServerError, errMsg)
 	}
 	s.Logger.Debug("About to check username: %s , password: %s", uLogin.Username, uLogin.PasswordHash)
 	if s.server.Authenticator.AuthenticateUser(uLogin.Username, uLogin.PasswordHash) {
@@ -341,7 +370,7 @@ func main() {
 	e.GET("/goAppInfo", server.GetAppInfoHandler())
 	e.POST(jwtAuthUrl, myF5Service.login)
 	//curl -v -H "UserId: YOUR_F5_USER" -c cookies.txt http://localhost:8787/goLogin
-	//curl -v -b cookies.txt http://localhost:8787/goapi/v1/status
+	//curl -v -b cookies.txt http://localhost:8787/goapi/v1/status|jq
 	// or if you have a token stored in $TOKEN
 	//curl -v -b "jwt-token=${TOKEN}"  http://localhost:8787/goapi/v1/status
 	e.GET(jwtAuthUrl, myF5Service.getJwtCookieFromF5)
