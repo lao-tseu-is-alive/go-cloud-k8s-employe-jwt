@@ -12,8 +12,6 @@
 Thumbs.db
 
 # Go build cache and modules
-/pkg/
-**/pkg/
 bin/
 **/bin/
 vendor/
@@ -66,3 +64,6 @@ coverage.*
 /.env_for_github.txt
 /db/config_pgsql.py
 /go_cloud_k8s_employe_jwt.conf
+
+/deployments/
+/deployments/go-testing/app-secrets-go-cloud-k8s-employe-jwt.yaml

@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  APP_ENV: "PROD"
+  PORT: "8787"
+kind: ConfigMap
+metadata:
+  name: app-config-go-cloud-k8s-employe-jwt
