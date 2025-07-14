@@ -1,0 +1,68 @@
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Go build cache and modules
+/pkg/
+**/pkg/
+bin/
+**/bin/
+vendor/
+**/vendor/
+
+# Git files
+.git
+.gitignore
+
+# Editor and IDE files
+*.swp
+*.swo
+*.idea/
+*.vscode/
+*.project
+*.settings/
+*.classpath
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Frontend dependencies and build artifacts
+cmd/goEmployeJwtServer/goEmployeJwtFront/node_modules/
+cmd/goEmployeJwtServer/goEmployeJwtFront/build/
+cmd/goEmployeJwtServer/goEmployeJwtFront/.env
+cmd/goEmployeJwtServer/goEmployeJwtFront/.idea
+cmd/goEmployeJwtServer/goEmployeJwtFront/.vscode
+cmd/goEmployeJwtServer/goEmployeJwtFront/index.html
+cmd/goEmployeJwtServer/goEmployeJwtFront/package.json
+cmd/goEmployeJwtServer/goEmployeJwtFront/package-lock.json
+cmd/goEmployeJwtServer/goEmployeJwtFront/*.json
+cmd/goEmployeJwtServer/goEmployeJwtFront/.cache
+cmd/goEmployeJwtServer/goEmployeJwtFront/src/
+
+# Miscellaneous
+coverage.*
+.env
+.env_for_github.txt
+.env.*
+*.local
+
+# Editor/IDE
+.idea/
+.vscode/
+/.env_for_github.txt
+/db/config_pgsql.py
+/go_cloud_k8s_employe_jwt.conf

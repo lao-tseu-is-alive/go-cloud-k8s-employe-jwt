@@ -27,6 +27,8 @@ go.work.sum
 # env file
 .env
 .env_for_github.txt
+.env.*
+*.local
 
 # Editor/IDE
 .idea/
