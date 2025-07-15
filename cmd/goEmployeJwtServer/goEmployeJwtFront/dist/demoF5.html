@@ -59,7 +59,7 @@
             return;
         }
 
-        const baseUrl = inputBaseUrl.value==="" ? 'http://localhost:8787': inputBaseUrl.value;
+        const baseUrl = inputBaseUrl.value==="" ? '': inputBaseUrl.value;
         const withHeader = inputWithHeader.checked;
 
         logMessage(`Testing /goLogin with UserId: ${userId}...`);
@@ -68,7 +68,7 @@
             if (withHeader) {
                 headers['UserId'] = userId;
             }
-            const response = await fetch(`${baseUrl}/goLogin`, {
+            const response = await fetch(`${baseUrl}/gologin`, {
                 method: 'GET',
                 headers: headers,
                 credentials: 'include' // Include cookies in the request
@@ -92,7 +92,7 @@
     async function testStatus() {
         output.textContent = ''; // Clear previous output
         logMessage('Testing /goapi/v1/status...');
-        const baseUrl = inputBaseUrl.value==="" ? 'http://localhost:8787': inputBaseUrl.value;
+        const baseUrl = inputBaseUrl.value==="" ? '': inputBaseUrl.value;
         try {
             const response = await fetch(`${baseUrl}/goapi/v1/status`, {
                 method: 'GET',
