@@ -146,6 +146,7 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			// Prepare the http only cookie for jwt token
 			cookie := new(http.Cookie)
 			cookie.Name = "jwt-token"
+			cookie.Path = "/"
 			cookie.Value = token.String()
 			cookie.Expires = time.Now().Add(24 * time.Hour) // Set expiration
 			cookie.HttpOnly = true                          // ⭐ Most important part: prevents JS access
