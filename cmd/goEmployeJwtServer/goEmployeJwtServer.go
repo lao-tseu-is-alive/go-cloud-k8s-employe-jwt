@@ -75,21 +75,23 @@ func GetJwtCookieNameFromEnv(defaultName string) string {
 	return fmt.Sprintf("%s", val)
 }
 
-func cookieToHeaderMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// If the Authorization header is already present, do nothing.
-		if c.Request().Header.Get("Authorization") != "" {
+func cookieToHeaderMiddleware(cookieName string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// If the Authorization header is already present, do nothing.
+			if c.Request().Header.Get("Authorization") != "" {
+				return next(c)
+			}
+
+			cookie, err := c.Cookie(cookieName) // Use the provided cookieName
+			if err == nil {
+				// If the cookie exists, create the Bearer token header.
+				bearerToken := "Bearer " + cookie.Value
+				c.Request().Header.Set("Authorization", bearerToken)
+			}
+
 			return next(c)
 		}
-
-		cookie, err := c.Cookie("jwt-token")
-		if err == nil {
-			// If the cookie exists, create the Bearer token header.
-			bearerToken := "Bearer " + cookie.Value
-			c.Request().Header.Set("Authorization", bearerToken)
-		}
-
-		return next(c)
 	}
 }
 
@@ -412,7 +414,7 @@ func main() {
 	}
 
 	e := server.GetEcho()
-	e.Use(cookieToHeaderMiddleware)
+	e.Use(cookieToHeaderMiddleware(myF5Service.jwtCookieName))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"https://golux.lausanne.ch", "http://localhost:3000"},
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
@@ -442,7 +444,7 @@ func main() {
 	//curl -v -H "UserId: YOUR_F5_USER" -c cookies.txt http://localhost:8787/goLogin
 	//curl -v -b cookies.txt http://localhost:8787/goapi/v1/status|jq
 	// or if you have a token stored in $TOKEN
-	//curl -v -b "jwt-token=${TOKEN}"  http://localhost:8787/goapi/v1/status
+	//curl -v -b "yourOwnJwtCookieName=${TOKEN}"  http://localhost:8787/goapi/v1/status
 	e.GET(jwtAuthUrl, myF5Service.getJwtCookieFromF5)
 	r := server.GetRestrictedGroup()
 	r.GET("/status", myF5Service.GetStatus)
