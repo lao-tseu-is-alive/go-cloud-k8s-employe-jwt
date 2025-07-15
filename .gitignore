@@ -37,3 +37,4 @@ go.work.sum
 /db/config_pgsql.py
 /go_cloud_k8s_employe_jwt.conf
 /deployments/go-testing/app-secrets-go-cloud-k8s-employe-jwt.yaml
+/deployments/go-testing/sealed-app-secrets-go-cloud-k8s-employe-jwt.yaml

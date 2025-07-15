@@ -253,6 +253,12 @@ spec:
               secretKeyRef:
                 key: ADMIN_ID
                 name: app-secrets-go-cloud-k8s-employe-jwt
+          - name: ADMIN_EXTERNAL_ID
+            valueFrom:
+              secretKeyRef:
+                key: ADMIN_EXTERNAL_ID
+                name: app-secrets-go-cloud-k8s-employe-jwt
+
           - name: ALLOWED_HOSTS
             valueFrom:
               secretKeyRef:
