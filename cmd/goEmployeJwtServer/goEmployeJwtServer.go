@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"embed"
+	"errors"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -17,6 +18,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -50,11 +52,14 @@ type UserLogin struct {
 	Username     string `json:"username"`
 }
 type Service struct {
-	Logger golog.MyLogger
-	Store  f5.Storage
-	dbConn database.DB
-	server *goHttpEcho.Server
-	auth   f5.Authentication
+	// AllowedHostnames is a list of strings which will be matched to the client
+	// requesting for a connection upgrade to a websocket connection
+	AllowedHostnames []string
+	Logger           golog.MyLogger
+	Store            f5.Storage
+	dbConn           database.DB
+	server           *goHttpEcho.Server
+	auth             f5.Authentication
 }
 
 func cookieToHeaderMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -75,8 +80,38 @@ func cookieToHeaderMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func validateHostAllowed(r *http.Request, allowedHostnames []string, l golog.MyLogger) error {
+	requesterHostname := r.Host
+	l.Info("validateHostAllowed(remote host: %s)", requesterHostname)
+	if slices.Contains(allowedHostnames, "*") {
+		return nil
+	}
+	if strings.Index(requesterHostname, ":") != -1 {
+		requesterHostname = strings.Split(requesterHostname, ":")[0]
+	}
+	if slices.Contains(allowedHostnames, "localhost") {
+		if requesterHostname == "127.0.0.1" || requesterHostname == "::1" {
+			return nil
+		}
+	}
+	for _, allowedHostname := range allowedHostnames {
+		if requesterHostname == allowedHostname {
+			return nil
+		}
+	}
+	msgErr := fmt.Sprintf("failed to find '%s' in the list of allowed hostnames", requesterHostname)
+	l.Warn(msgErr)
+	return errors.New(msgErr)
+}
+
 func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 	s.Logger.TraceHttpRequest("getJwtCookieFromF5", ctx.Request())
+	err := validateHostAllowed(ctx.Request(), s.AllowedHostnames, s.Logger)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating host: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusUnauthorized, errMsg)
+	}
 	// get the user from the F5 Header UserId
 	login := strings.TrimSpace(ctx.Request().Header.Get("UserId"))
 	if login == "" {
@@ -130,6 +165,12 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 
 func (s Service) getJwtTokenFromF5AsJS(ctx echo.Context) error {
 	s.Logger.TraceHttpRequest("getJwtTokenFromF5AsJS", ctx.Request())
+	err := validateHostAllowed(ctx.Request(), s.AllowedHostnames, s.Logger)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating host: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusUnauthorized, errMsg)
+	}
 	// get the user from the F5 Header UserId
 	login := strings.TrimSpace(ctx.Request().Header.Get("UserId"))
 	if login == "" {
@@ -187,6 +228,12 @@ func (s Service) getJwtTokenFromF5AsJS(ctx echo.Context) error {
 // and share the same secret with the above component
 func (s Service) login(ctx echo.Context) error {
 	s.Logger.TraceHttpRequest("login", ctx.Request())
+	err := validateHostAllowed(ctx.Request(), s.AllowedHostnames, s.Logger)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating host: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusUnauthorized, errMsg)
+	}
 	uLogin := new(UserLogin)
 	login := ctx.FormValue("login")
 	passwordHash := ctx.FormValue("hashed")
@@ -200,7 +247,7 @@ func (s Service) login(ctx echo.Context) error {
 		uLogin.Username = login
 		uLogin.PasswordHash = passwordHash
 	}
-	err := f5.ValidateLogin(uLogin.Username)
+	err = f5.ValidateLogin(uLogin.Username)
 	if err != nil {
 		errMsg := fmt.Sprintf("error validating user login: %v", err)
 		s.Logger.Error(errMsg)
@@ -239,6 +286,12 @@ func (s Service) login(ctx echo.Context) error {
 
 func (s Service) GetStatus(ctx echo.Context) error {
 	s.Logger.TraceHttpRequest("GetStatus", ctx.Request())
+	err := validateHostAllowed(ctx.Request(), s.AllowedHostnames, s.Logger)
+	if err != nil {
+		errMsg := fmt.Sprintf("error validating host: %v", err)
+		s.Logger.Error(errMsg)
+		return ctx.JSON(http.StatusUnauthorized, errMsg)
+	}
 	// get the current user from JWT TOKEN
 	claims := s.server.JwtCheck.GetJwtCustomClaimsFromContext(ctx)
 	currentUserId := claims.User.UserId
@@ -301,7 +354,7 @@ func main() {
 		config.GetJwtContextKeyFromEnvOrPanic(),
 		config.GetJwtDurationFromEnvOrPanic(60),
 		l)
-
+	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
 	myF5Store := f5.GetStorageInstanceOrPanic("pgx", db, l)
 	// Create a new Authenticator with a F5
 	myAuthenticator := f5.NewF5Authenticator(
@@ -334,11 +387,12 @@ func main() {
 		},
 	)
 	myF5Service := Service{
-		Logger: l,
-		Store:  myF5Store,
-		dbConn: db,
-		server: server,
-		auth:   myAuthenticator,
+		AllowedHostnames: allowedHosts,
+		Logger:           l,
+		Store:            myF5Store,
+		dbConn:           db,
+		server:           server,
+		auth:             myAuthenticator,
 	}
 
 	e := server.GetEcho()
