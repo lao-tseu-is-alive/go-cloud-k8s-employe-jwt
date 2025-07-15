@@ -285,6 +285,12 @@ spec:
               secretKeyRef:
                 key: JWT_AUTH_URL
                 name: app-secrets-go-cloud-k8s-employe-jwt
+          - name: JWT_COOKIE_NAME
+            valueFrom:
+              secretKeyRef:
+                key: JWT_COOKIE_NAME
+                name: app-secrets-go-cloud-k8s-employe-jwt
+
 
           - name: DB_DRIVER
             valueFrom:

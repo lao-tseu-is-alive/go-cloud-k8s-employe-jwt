@@ -17,6 +17,7 @@ import (
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt/pkg/version"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -29,6 +30,7 @@ const (
 	defaultDBIp                  = "127.0.0.1"
 	defaultDBSslMode             = "prefer"
 	defaultRestrictedUrlBasePath = "/goapi/v1"
+	defaultJwtCookieName         = "goJWT_token"
 	defaultWebRootDir            = "goEmployeJwtFront/dist/"
 	defaultAdminUser             = "goadmin"
 	defaultAdminEmail            = "goadmin@yourdomain.org"
@@ -60,6 +62,17 @@ type Service struct {
 	dbConn           database.DB
 	server           *goHttpEcho.Server
 	auth             f5.Authentication
+	jwtCookieName    string
+}
+
+// GetJwtCookieNameFromEnv returns a the name of the http-only cookie to be used to use JWT from env variable
+// JWT_COOKIE_NAME : should exist and contain a string with your cookie name or this function will use the passed default
+func GetJwtCookieNameFromEnv(defaultName string) string {
+	val, exist := os.LookupEnv("JWT_COOKIE_NAME")
+	if !exist {
+		return defaultName
+	}
+	return fmt.Sprintf("%s", val)
 }
 
 func cookieToHeaderMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -145,7 +158,7 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			}
 			// Prepare the http only cookie for jwt token
 			cookie := new(http.Cookie)
-			cookie.Name = "jwt-token"
+			cookie.Name = s.jwtCookieName
 			cookie.Path = "/"
 			cookie.Value = token.String()
 			cookie.Expires = time.Now().Add(24 * time.Hour) // Set expiration
@@ -387,6 +400,7 @@ func main() {
 			RestrictedUrl: defaultRestrictedUrlBasePath,
 		},
 	)
+	cookieNameForJWT := GetJwtCookieNameFromEnv(defaultJwtCookieName)
 	myF5Service := Service{
 		AllowedHostnames: allowedHosts,
 		Logger:           l,
@@ -394,6 +408,7 @@ func main() {
 		dbConn:           db,
 		server:           server,
 		auth:             myAuthenticator,
+		jwtCookieName:    cookieNameForJWT,
 	}
 
 	e := server.GetEcho()
@@ -429,8 +444,6 @@ func main() {
 	// or if you have a token stored in $TOKEN
 	//curl -v -b "jwt-token=${TOKEN}"  http://localhost:8787/goapi/v1/status
 	e.GET(jwtAuthUrl, myF5Service.getJwtCookieFromF5)
-	//curl -H "UserId: YOUR_F5_USER" http://localhost:8787/jwtinfo.js
-	e.GET("/jwtinfo.js", myF5Service.getJwtTokenFromF5AsJS)
 	r := server.GetRestrictedGroup()
 	r.GET("/status", myF5Service.GetStatus)
 

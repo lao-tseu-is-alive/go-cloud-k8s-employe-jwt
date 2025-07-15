@@ -3,7 +3,7 @@ package version
 var (
 	APP        = "goEmployeJwt"
 	AppSnake   = "go-cloud-k8s-employe-jwt"
-	VERSION    = "0.0.10"
+	VERSION    = "0.1.0"
 	REPOSITORY = "https://github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt"
 	REVISION   = "unknown"
 	BuildStamp = "unknown"
