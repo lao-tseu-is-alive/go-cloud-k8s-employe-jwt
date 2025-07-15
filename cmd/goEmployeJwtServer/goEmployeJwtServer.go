@@ -360,7 +360,7 @@ func main() {
 	myAuthenticator := f5.NewF5Authenticator(
 		&goHttpEcho.UserInfo{
 			UserId:     config.GetAdminIdFromEnvOrPanic(defaultAdminId),
-			ExternalId: config.GetAdminExternalIdFromEnvOrPanic(9999999),
+			ExternalId: config.GetAdminExternalIdFromEnvOrPanic(99999),
 			Name:       "NewSimpleAdminAuthenticator_Admin",
 			Email:      config.GetAdminEmailFromEnvOrPanic(defaultAdminEmail),
 			Login:      config.GetAdminUserFromEnvOrPanic(defaultAdminUser),

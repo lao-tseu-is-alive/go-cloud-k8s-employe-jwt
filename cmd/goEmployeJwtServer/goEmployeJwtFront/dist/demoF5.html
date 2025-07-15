@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Cookie Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1>JWT Cookie Test</h1>
+
+<p>Enter base url  test the /goLogin endpoint and verify the cookie with /goapi/v1/status.</p>
+<label for="baseUrl">baseUrl:</label>
+<input type="text" id="baseUrl" placeholder="Enter baseUrl" value="http://localhost:8787">
+
+<input type="checkbox" id="withHeader" checked>
+<p>Enter a UserId to test the /goLogin endpoint and verify the cookie with /goapi/v1/status.</p>
+<label for="userId">UserId:</label>
+<input type="text" id="userId" placeholder="Enter UserId (e.g., testuser)" value="testuser">
+<br><br>
+<button onclick="testLogin()">Test /goLogin</button>
+<button onclick="testStatus()">Test /goapi/v1/status</button>
+<div id="output">Results will appear here...</div>
+
+<script>
+    const output = document.getElementById('output');
+    const inputWithHeader= document.getElementById('withHeader');
+    const inputBaseUrl= document.getElementById('baseUrl');
+
+
+
+    // Function to log messages to the output div
+    function logMessage(message) {
+        output.textContent += message + '\n';
+    }
+
+    // Function to test /goLogin endpoint
+    async function testLogin() {
+        output.textContent = ''; // Clear previous output
+        const userId = document.getElementById('userId').value.trim();
+        if (!userId) {
+            logMessage('Error: Please enter a UserId.');
+            return;
+        }
+
+        const baseUrl = inputBaseUrl.value==="" ? 'http://localhost:8787': inputBaseUrl.value;
+        const withHeader = inputWithHeader.checked;
+
+        logMessage(`Testing /goLogin with UserId: ${userId}...`);
+        try {
+            const headers = {};
+            if (withHeader) {
+                headers['UserId'] = userId;
+            }
+            const response = await fetch(`${baseUrl}/goLogin`, {
+                method: 'GET',
+                headers: headers,
+                credentials: 'include' // Include cookies in the request
+            });
+
+            const responseText = await response.text();
+            if (response.ok) {
+                logMessage(`Success: /goLogin responded with status ${response.status}.`);
+                logMessage(`Response: ${responseText}`);
+                logMessage('Check browser developer tools (Application > Cookies) to verify if "jwt-token" cookie was set.');
+            } else {
+                logMessage(`Error: /goLogin failed with status ${response.status}.`);
+                logMessage(`Response: ${responseText}`);
+            }
+        } catch (error) {
+            logMessage(`Error: Failed to fetch /goLogin: ${error.message}`);
+        }
+    }
+
+    // Function to test /goapi/v1/status endpoint
+    async function testStatus() {
+        output.textContent = ''; // Clear previous output
+        logMessage('Testing /goapi/v1/status...');
+        const baseUrl = inputBaseUrl.value==="" ? 'http://localhost:8787': inputBaseUrl.value;
+        try {
+            const response = await fetch(`${baseUrl}/goapi/v1/status`, {
+                method: 'GET',
+                credentials: 'include' // Include cookies to send jwt-token
+            });
+
+
+
+            const responseData = await response.json();
+            if (response.ok) {
+                logMessage(`Success: /goapi/v1/status responded with status ${response.status}.`);
+                logMessage('Response: ' + JSON.stringify(responseData, null, 2));
+                logMessage('The jwt-token cookie was likely sent in the Authorization header (check server logs).');
+            } else {
+                logMessage(`Error: /goapi/v1/status failed with status ${response.status}.`);
+                logMessage('Response: ' + JSON.stringify(responseData, null, 2));
+            }
+        } catch (error) {
+            logMessage(`Error: Failed to fetch /goapi/v1/status: ${error.message}`);
+        }
+    }
+</script>
+</body>
+</html>
