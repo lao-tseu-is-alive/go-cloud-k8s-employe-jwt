@@ -46,6 +46,7 @@ func (sa *Authenticator) AuthenticateUser(userLogin, passwordHash string) bool {
 	if sa.store.Exist(userLogin) {
 		return true
 	}
+	//MAYBE add login failure to DB ?
 	l.Warn("AuthenticateUser(%s) is false user will not be authenticated", userLogin)
 	return false
 }

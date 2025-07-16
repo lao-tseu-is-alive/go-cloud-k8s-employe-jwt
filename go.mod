@@ -6,7 +6,7 @@ require (
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/labstack/echo/v4 v4.13.4
-	github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs v0.3.17
+	github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs v0.3.18
 )
 
 require (

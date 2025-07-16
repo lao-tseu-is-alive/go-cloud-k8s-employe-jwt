@@ -9,15 +9,14 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/config"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/database"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/f5"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/goHttpEcho"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/metadata"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common-libs/pkg/tools"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt/pkg/f5"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-employe-jwt/pkg/version"
 	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -30,6 +29,7 @@ const (
 	defaultDBIp                  = "127.0.0.1"
 	defaultDBSslMode             = "prefer"
 	defaultRestrictedUrlBasePath = "/goapi/v1"
+	defaultJwtStatusUrl          = "/status"
 	defaultJwtCookieName         = "goJWT_token"
 	defaultWebRootDir            = "goEmployeJwtFront/dist/"
 	defaultAdminUser             = "goadmin"
@@ -63,36 +63,6 @@ type Service struct {
 	server           *goHttpEcho.Server
 	auth             f5.Authentication
 	jwtCookieName    string
-}
-
-// GetJwtCookieNameFromEnv returns a the name of the http-only cookie to be used to use JWT from env variable
-// JWT_COOKIE_NAME : should exist and contain a string with your cookie name or this function will use the passed default
-func GetJwtCookieNameFromEnv(defaultName string) string {
-	val, exist := os.LookupEnv("JWT_COOKIE_NAME")
-	if !exist {
-		return defaultName
-	}
-	return fmt.Sprintf("%s", val)
-}
-
-func cookieToHeaderMiddleware(cookieName string) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// If the Authorization header is already present, do nothing.
-			if c.Request().Header.Get("Authorization") != "" {
-				return next(c)
-			}
-
-			cookie, err := c.Cookie(cookieName) // Use the provided cookieName
-			if err == nil {
-				// If the cookie exists, create the Bearer token header.
-				bearerToken := "Bearer " + cookie.Value
-				c.Request().Header.Set("Authorization", bearerToken)
-			}
-
-			return next(c)
-		}
-	}
 }
 
 func validateHostAllowed(r *http.Request, allowedHostnames []string, l golog.MyLogger) error {
@@ -353,6 +323,7 @@ func main() {
 
 	// Get the ENV JWT_AUTH_URL value
 	jwtAuthUrl := config.GetJwtAuthUrlFromEnvOrPanic()
+	jwtStatusUrl := config.GetJwtStatusUrlFromEnv(defaultJwtStatusUrl)
 
 	myVersionReader := goHttpEcho.NewSimpleVersionReader(
 		version.APP,
@@ -361,6 +332,7 @@ func main() {
 		version.REVISION,
 		version.BuildStamp,
 		jwtAuthUrl,
+		jwtStatusUrl,
 	)
 	// Create a new JWT checker
 	myJwt := goHttpEcho.NewJwtChecker(
@@ -402,7 +374,7 @@ func main() {
 			RestrictedUrl: defaultRestrictedUrlBasePath,
 		},
 	)
-	cookieNameForJWT := GetJwtCookieNameFromEnv(defaultJwtCookieName)
+	cookieNameForJWT := config.GetJwtCookieNameFromEnv(defaultJwtCookieName)
 	myF5Service := Service{
 		AllowedHostnames: allowedHosts,
 		Logger:           l,
@@ -414,7 +386,7 @@ func main() {
 	}
 
 	e := server.GetEcho()
-	e.Use(cookieToHeaderMiddleware(myF5Service.jwtCookieName))
+	e.Use(goHttpEcho.CookieToHeaderMiddleware(myF5Service.jwtCookieName))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"https://golux.lausanne.ch", "http://localhost:3000"},
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
