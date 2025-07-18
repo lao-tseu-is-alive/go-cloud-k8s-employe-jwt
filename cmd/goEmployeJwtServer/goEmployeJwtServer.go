@@ -133,10 +133,10 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			cookie.Name = s.jwtCookieName
 			cookie.Path = "/"
 			cookie.Value = token.String()
-			cookie.Expires = time.Now().Add(24 * time.Hour) // Set expiration
-			cookie.HttpOnly = true                          // ⭐ Most important part: prevents JS access
-			cookie.Secure = true                            // Only send over HTTPS
-			cookie.SameSite = http.SameSiteLaxMode          // CSRF protection
+			cookie.Expires = time.Now().Add(4 * time.Hour) // Set expiration
+			cookie.HttpOnly = true                         // ⭐ Most important part: prevents JS access
+			cookie.Secure = true                           // Only send over HTTPS
+			cookie.SameSite = http.SameSiteLaxMode         // CSRF protection
 			ctx.SetCookie(cookie)
 			myMsg := fmt.Sprintf("getJwtCookieFromF5(%s) successful, token set in HTTP-Only cookie.", login)
 			s.Logger.Info(myMsg)
@@ -388,8 +388,9 @@ func main() {
 	e := server.GetEcho()
 	e.Use(goHttpEcho.CookieToHeaderMiddleware(myF5Service.jwtCookieName))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"https://golux.lausanne.ch", "http://localhost:3000"},
-		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
+		AllowOrigins:     []string{"https://golux.lausanne.ch", "http://localhost:3000"},
+		AllowMethods:     []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
+		AllowCredentials: true,
 	}))
 	e.GET("/readiness", server.GetReadinessHandler(func(info string) bool {
 		ver, err := db.GetVersion()
