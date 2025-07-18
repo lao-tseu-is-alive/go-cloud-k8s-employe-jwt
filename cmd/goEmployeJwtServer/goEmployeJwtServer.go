@@ -136,11 +136,15 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			cookie.Expires = time.Now().Add(4 * time.Hour) // Set expiration
 			cookie.HttpOnly = true                         // ⭐ Most important part: prevents JS access
 			cookie.Secure = true                           // Only send over HTTPS
-			cookie.SameSite = http.SameSiteLaxMode         // CSRF protection
+			cookie.SameSite = http.SameSiteNoneMode        // CSRF protection
 			ctx.SetCookie(cookie)
-			myMsg := fmt.Sprintf("getJwtCookieFromF5(%s) successful, token set in HTTP-Only cookie.", login)
-			s.Logger.Info(myMsg)
-			return ctx.JSON(http.StatusOK, myMsg)
+
+			// Prepare the response
+			response := map[string]string{
+				"token": token.String(),
+			}
+			s.Logger.Info(fmt.Sprintf("getJwtCookieFromF5(%s) successful, token set in HTTP-Only cookie.", login))
+			return ctx.JSON(http.StatusOK, response)
 		} else {
 			myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get jwt token user: %s, does not exist in DB", login)
 			s.Logger.Warn(myErrMsg)
