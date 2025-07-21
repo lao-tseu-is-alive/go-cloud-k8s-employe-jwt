@@ -20,7 +20,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 )
 
 const (
@@ -129,17 +128,19 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 				s.Logger.Error(myErrMsg)
 				return ctx.JSON(http.StatusInternalServerError, map[string]string{"jwtStatus": myErrMsg, "token": ""})
 			}
-			// Prepare the http only cookie for jwt token
-			cookie := new(http.Cookie)
-			cookie.Name = s.jwtCookieName
-			cookie.Path = "/"
-			cookie.Value = token.String()
-			cookie.Expires = time.Now().Add(4 * time.Hour) // Set expiration
-			cookie.HttpOnly = true                         // ⭐ Most important part: prevents JS access
-			cookie.Secure = true                           // Only send over HTTPS
-			cookie.SameSite = http.SameSiteNoneMode        // CSRF protection
-			ctx.SetCookie(cookie)
-
+			/*
+				get rid of cookie for now
+				// Prepare the http only cookie for jwt token
+				cookie := new(http.Cookie)
+				cookie.Name = s.jwtCookieName
+				cookie.Path = "/"
+				cookie.Value = token.String()
+				cookie.Expires = time.Now().Add(4 * time.Hour) // Set expiration
+				cookie.HttpOnly = true                         // ⭐ Most important part: prevents JS access
+				cookie.Secure = true                           // Only send over HTTPS
+				cookie.SameSite = http.SameSiteNoneMode        // CSRF protection
+				ctx.SetCookie(cookie)
+			*/
 			// Prepare the response
 			response := map[string]string{
 				"jwtStatus": "success",
