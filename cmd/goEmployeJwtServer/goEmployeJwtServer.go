@@ -124,9 +124,9 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			}
 			token, err := s.server.JwtCheck.GetTokenFromUserInfo(userInfo)
 			if err != nil {
-				myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get jwt token from user info: %v", err)
+				myErrMsg := fmt.Sprintf("error in getJwtCookieFromF5, failed to get jwt token from user info: %v", err)
 				s.Logger.Error(myErrMsg)
-				return ctx.JSON(http.StatusInternalServerError, map[string]string{"status": myErrMsg})
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{"jwtStatus": myErrMsg, "token": ""})
 			}
 			// Prepare the http only cookie for jwt token
 			cookie := new(http.Cookie)
@@ -141,14 +141,16 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 
 			// Prepare the response
 			response := map[string]string{
-				"token": token.String(),
+				"jwtStatus": "success",
+				"token":     token.String(),
 			}
 			s.Logger.Info(fmt.Sprintf("getJwtCookieFromF5(%s) successful, token set in HTTP-Only cookie.", login))
 			return ctx.JSON(http.StatusOK, response)
+
 		} else {
-			myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get jwt token user: %s, does not exist in DB", login)
+			myErrMsg := fmt.Sprintf("error in getJwtCookieFromF5 failed to get jwt token user: %s, does not exist in DB", login)
 			s.Logger.Warn(myErrMsg)
-			return ctx.JSON(http.StatusUnauthorized, map[string]string{"status": myErrMsg})
+			return ctx.JSON(http.StatusUnauthorized, map[string]string{"jwtStatus": myErrMsg, "token": ""})
 		}
 	}
 }
