@@ -102,14 +102,15 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 	if login == "" {
 		myErrMsg := "getJwtCookieFromF5 failed to get login because UserId F5 header is missing"
 		s.Logger.Warn(myErrMsg)
-		return ctx.JSON(http.StatusUnauthorized, map[string]string{"status": myErrMsg})
+		return ctx.JSON(http.StatusUnauthorized, map[string]string{"jwtStatus": myErrMsg, "token": ""})
+
 	} else {
 		s.Logger.Debug("About to check username: %s ", login)
 		err := f5.ValidateLogin(login)
 		if err != nil {
-			errMsg := fmt.Sprintf("error validating user login: %v", err)
-			s.Logger.Error(errMsg)
-			return ctx.JSON(http.StatusBadRequest, errMsg)
+			myErrMsg := fmt.Sprintf("error validating user login: %v", err)
+			s.Logger.Error(myErrMsg)
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{"jwtStatus": myErrMsg, "token": ""})
 		}
 		h := sha256.New()
 		h.Write([]byte(version.APP))
@@ -120,7 +121,7 @@ func (s Service) getJwtCookieFromF5(ctx echo.Context) error {
 			if err != nil {
 				myErrMsg := fmt.Sprintf("getJwtCookieFromF5 failed to get user info from login: %v", err)
 				s.Logger.Error(myErrMsg)
-				return ctx.JSON(http.StatusInternalServerError, map[string]string{"status": myErrMsg})
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{"jwtStatus": myErrMsg, "token": ""})
 			}
 			token, err := s.server.JwtCheck.GetTokenFromUserInfo(userInfo)
 			if err != nil {
